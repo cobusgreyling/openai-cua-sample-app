@@ -98,17 +98,69 @@ type ResponsesLoopResult = {
 const defaultInterActionDelayMs = 120;
 const toolExecutionTimeoutMs = 20_000;
 
+function isModelNotFoundError(error: unknown): boolean {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+
+  const candidate = error as { code?: string; status?: number; message?: string };
+
+  if (candidate.status === 404) {
+    return true;
+  }
+
+  if (candidate.code === "model_not_found") {
+    return true;
+  }
+
+  if (
+    typeof candidate.message === "string" &&
+    /model.*(not found|does not exist|is not available)/i.test(candidate.message)
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
 class OpenAIResponsesClient implements ResponsesClient {
   private readonly client: OpenAI;
+  private readonly fallbackModel: string;
+  private fallbackActive = false;
 
   constructor(apiKey: string) {
     this.client = new OpenAI({ apiKey });
+    this.fallbackModel =
+      process.env.CUA_FALLBACK_MODEL?.trim() || "computer-use-preview";
   }
 
   async create(request: Record<string, unknown>, signal: AbortSignal) {
-    return (await this.client.responses.create(request, {
-      signal,
-    })) as ResponsesApiResponse;
+    const requestedModel = request.model;
+    const effectiveRequest = this.fallbackActive
+      ? { ...request, model: this.fallbackModel }
+      : request;
+
+    try {
+      return (await this.client.responses.create(effectiveRequest, {
+        signal,
+      })) as ResponsesApiResponse;
+    } catch (error) {
+      if (this.fallbackActive || !isModelNotFoundError(error)) {
+        throw error;
+      }
+
+      this.fallbackActive = true;
+      console.warn(
+        `[cua] model "${String(requestedModel)}" not available; ` +
+          `retrying with fallback "${this.fallbackModel}". ` +
+          `Set CUA_FALLBACK_MODEL or CUA_DEFAULT_MODEL to override.`,
+      );
+
+      return (await this.client.responses.create(
+        { ...request, model: this.fallbackModel },
+        { signal },
+      )) as ResponsesApiResponse;
+    }
   }
 }
 

@@ -2,6 +2,9 @@
 
 TypeScript sample app for browser-focused computer-use workflows with GPT-5.5. The repo includes:
 
+> **Model availability note.** `gpt-5.5` is the model identifier this sample requests against the OpenAI Responses API. If your account does not yet expose a model registered under that ID, the runner automatically retries the call with `CUA_FALLBACK_MODEL` (default `computer-use-preview`). Override either env var to point at whatever computer-use-capable model you actually have access to.
+
+
 - `apps/demo-web`: a Next.js operator console for starting runs and reviewing screenshots, events, and replay artifacts
 - `apps/runner`: a Fastify runner that manages mutable workspaces, browser sessions, SSE, and replay bundles
 - `packages/*`: shared scenario, runtime, and contract packages that make it easy to add new labs later
@@ -130,6 +133,7 @@ Runner:
 - `HOST` (default `127.0.0.1`)
 - `PORT` (default `4001`)
 - `CUA_DEFAULT_MODEL` (default `gpt-5.5`)
+- `CUA_FALLBACK_MODEL` (default `computer-use-preview`) — used automatically when `CUA_DEFAULT_MODEL` returns `model_not_found`
 - `CUA_RESPONSES_MODE` (`auto`, `fallback`, or `live`)
 
 Web:
